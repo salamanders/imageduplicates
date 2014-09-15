@@ -1,17 +1,17 @@
 /*
  * The MIT License
- * 
+ *
  * Copyright 2014 Benjamin Hill.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  * associated documentation files (the "Software"), to deal in the Software without restriction,
  * including without limitation the rights to use, copy, modify, merge, publish, distribute,
  * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all copies or
  * substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT
  * NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
  * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
@@ -25,69 +25,20 @@ import java.awt.RenderingHints;
 import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.SortedSet;
-import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.google.common.io.Files;
+import com.google.common.primitives.Ints;
 
 public class ImageUtils {
-  static final Logger LOG = Logger.getLogger(ImageUtils.class.getName());
 
-  public static SortedSet<File> getAllImageFiles() throws IOException {
+  private static final Logger LOG = Logger.getLogger(ImageUtils.class.getName());
 
-    final SortedSet<File> files = new ConcurrentSkipListSet<>();
-
-    final Path root = Paths.get(System.getProperty("user.home"));
-
-    java.nio.file.Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
-
-      @Override
-      public FileVisitResult preVisitDirectory(final Path dir, final BasicFileAttributes attrs) {
-        if (dir.toString().contains("iPhoto Library")
-            || dir.toString().toLowerCase().contains("temp")) {
-          LOG.log(Level.FINE, "Bailed on subdir:{0}", dir.toString());
-          return FileVisitResult.SKIP_SUBTREE;
-        }
-        return FileVisitResult.CONTINUE;
-      }
-
-      @Override
-      public FileVisitResult visitFile(final Path filePath, final BasicFileAttributes attrs) {
-
-        switch (Files.getFileExtension(filePath.getFileName().toString().toLowerCase())) {
-          case "jpg":
-          case "jpeg":
-          case "png":
-          case "tif":
-          case "tiff":
-            files.add(filePath.toFile());
-            break;
-          default:
-            // skip
-        }
-        return FileVisitResult.CONTINUE;
-      }
-
-      @Override
-      public FileVisitResult visitFileFailed(final Path file, final IOException e)
-          throws IOException {
-        System.err.printf("Visiting failed for %s\n", file);
-        return FileVisitResult.SKIP_SUBTREE;
-      }
-    });
-
-    return files;
-  }
-
+  /**
+   * Normally not needed image to integer pixel data
+   *
+   * @param bi
+   * @return
+   */
   public static int[] getData(final BufferedImage bi) {
     BufferedImage tmp = bi;
     if (bi.getType() != BufferedImage.TYPE_INT_RGB) {
@@ -108,6 +59,10 @@ public class ImageUtils {
    * @return a scaled version of the original {@code BufferedImage}
    */
   public static BufferedImage getScaledInstance(final BufferedImage img, final int targetDim) {
+    if (img == null) {
+      throw new IllegalArgumentException("Null image");
+    }
+
     BufferedImage ret = img;
     int w, h;
 
@@ -145,6 +100,96 @@ public class ImageUtils {
   }
 
   /**
+   *
+   * From http://www.tomgibara.com/computer-vision/CannyEdgeDetector.java
+   */
+  private static int[] imageToGrayLumData(final BufferedImage sourceImage) {
+    final int width = sourceImage.getWidth();
+    final int height = sourceImage.getHeight();
+    final int[] data = new int[width * height];
+
+    switch (sourceImage.getType()) {
+      case BufferedImage.TYPE_INT_RGB:
+      case BufferedImage.TYPE_INT_ARGB: {
+        final int[] pixels =
+            (int[]) sourceImage.getData().getDataElements(0, 0, width, height, null);
+        assert pixels.length == data.length;
+        for (int i = 0; i < data.length; i++) {
+          data[i] = luminance(pixels[i]);
+        }
+      }
+      break;
+
+      case BufferedImage.TYPE_BYTE_GRAY: {
+        final byte[] pixels =
+            (byte[]) sourceImage.getData().getDataElements(0, 0, width, height, null);
+        assert pixels.length == data.length;
+        for (int i = 0; i < data.length; i++) {
+          data[i] = pixels[i] & 0xff;
+        }
+      }
+      break;
+      case BufferedImage.TYPE_USHORT_GRAY: {
+        final short[] pixels =
+            (short[]) sourceImage.getData().getDataElements(0, 0, width, height, null);
+        assert pixels.length == data.length;
+        for (int i = 0; i < data.length; i++) {
+          data[i] = (pixels[i] & 0xffff) / 256;
+        }
+      }
+      break;
+      case BufferedImage.TYPE_3BYTE_BGR: {
+        final byte[] pixels =
+            (byte[]) sourceImage.getData().getDataElements(0, 0, width, height, null);
+        int offset = 0;
+        for (int i = 0; i < data.length; i++) {
+          final int b = pixels[offset++] & 0xff;
+          final int g = pixels[offset++] & 0xff;
+          final int r = pixels[offset++] & 0xff;
+          data[i] = luminance(r, g, b);
+        }
+      }
+      break;
+      default:
+        throw new IllegalArgumentException("Unsupported image type: " + sourceImage.getType());
+    }
+    return data;
+  }
+
+  /**
+   * Very simple stretch of luminance integer pixels to 0 to 255
+   *
+   * @param data
+   * @return
+   */
+  public static short[] imageToNormalizedGrayLumData(final BufferedImage bi, final int dim) {
+    final int[] data = imageToGrayLumData(getScaledInstance(bi, dim));
+    final int min = Ints.min(data), max = Ints.max(data);
+    final double multiplier = 255d / (max - min);
+    final short[] result = new short[data.length];
+    for (int i = 0; i < data.length; i++) {
+      result[i] = (short) Math.round(multiplier * (data[i] - min));
+    }
+    return result;
+  }
+
+  /**
+   * From http://www.tomgibara.com/computer-vision/CannyEdgeDetector.java
+   *
+   * @param r
+   * @param g
+   * @param b
+   * @return
+   */
+  private static int luminance(final float r, final float g, final float b) {
+    return (int) Math.round(0.299d * r + 0.587d * g + 0.114d * b);
+  }
+
+  private static int luminance(final int rgb) {
+    return luminance((rgb & 0xff0000) >> 16, (rgb & 0xff00) >> 8, rgb & 0xff);
+  }
+
+  /**
    * Should be used to rotate already small images (thumbnails)
    *
    * @param bi
@@ -161,7 +206,14 @@ public class ImageUtils {
     return rot;
   }
 
+  /*
+   * public static BufferedImage convertToGrayScale(final BufferedImage image) { BufferedImage
+   * result = new BufferedImage( image.getWidth(), image.getHeight(), BufferedImage.TYPE_BYTE_GRAY);
+   * Graphics2D g = (Graphics2D) result.getGraphics(); g.drawImage(image, 0, 0, null); g.dispose();
+   * return result; }
+   */
   private ImageUtils() {
     // empty
   }
+
 }
