@@ -62,7 +62,7 @@ public class PCacheEntry implements Serializable {
       return (Long) n;
     }
     if (n instanceof Integer) {
-      return new Long((Integer) n);
+      return Long.valueOf((Integer) n);
     }
     throw new java.lang.IllegalArgumentException("getLong ran into a non-Long or non-Integer:"
         + col + " " + n.getClass().getName());
@@ -82,5 +82,9 @@ public class PCacheEntry implements Serializable {
 
   public void setPk(final String val) {
     put(pkCol, val);
+  }
+  
+  public boolean containsKey(final String val) {
+    return vals.containsKey(val);
   }
 }

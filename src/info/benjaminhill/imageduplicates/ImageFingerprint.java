@@ -42,18 +42,18 @@ public class ImageFingerprint implements Callable<List<Long>> {
 
   private static final CharMatcher CM_1 = CharMatcher.is('1');
 
-  public static final int MAX_DEPTH = 3;
+  public static final int MAX_DEPTH = 5;
   // There is some good trade-off between these two values. I don't know what it is.
   public static final int MAX_DIM = 64;
 
-  public static final int MAX_PRINTS = 99;
+  public static final int MAX_PRINTS = 4;
 
   private static int avg(final int... vals) {
     long avg = 0;
     for (final int s : vals) {
       avg += s;
     }
-    return Math.round(avg / vals.length);
+    return (int) Math.round(avg / (double) vals.length);
   }
 
   /**
@@ -78,15 +78,15 @@ public class ImageFingerprint implements Callable<List<Long>> {
     for (final String path : new String[] {
         "/Users/benhill/Google Drive/CIOTW/dark/raw_pa/G0036065.JPG",
         "/Users/benhill/Google Drive/CIOTW/dark/raw_pa/G0036066.JPG",
-        "/Users/benhill/Google Drive/CIOTW/dark/raw_pa/G0036067.JPG", /*
-         * "/Users/benhill/Pictures/GoPro/G0632004.JPG"
-         * ,
-         * "/Users/benhill/Desktop/upload/Summit/IMG_4405_stitch.jpg"
-         * ,
-         * "/Users/benhill/Desktop/upload/Summit/G0682300_stitch.jpg"
-         * ,
-         * "/Users/benhill/Desktop/upload/Summit/IMG_4366.JPG"
-         */}) {
+        "/Users/benhill/Google Drive/CIOTW/dark/raw_pa/G0036067.JPG", 
+         "/Users/benhill/Pictures/GoPro/G0632004.JPG"
+          ,
+         "/Users/benhill/Desktop/upload/Summit/IMG_4405_stitch.jpg"
+          ,
+          "/Users/benhill/Desktop/upload/Summit/G0682300_stitch.jpg"
+          ,
+          "/Users/benhill/Desktop/upload/Summit/IMG_4366.JPG"
+         }) {
       // System.out.println(Arrays.toString(ImageUtils.imageToNormalizedGrayLumData(new File(path),
       // 5)));
       final ImageFingerprint ifp = new ImageFingerprint(ImageIO.read(new File(path)));
@@ -196,12 +196,10 @@ public class ImageFingerprint implements Callable<List<Long>> {
 
   @Override
   public List<Long> call() throws Exception {
+    // Trying without the normalization
     final Map<Integer, List<Boolean>> deltas = new HashMap<>();
-    final short[] allLumsShort = ImageUtils.imageToNormalizedGrayLumData(bi, MAX_DIM);
-    final int[] allLums = new int[allLumsShort.length];
-    for (int i = 0; i < allLumsShort.length; i++) {
-      allLums[i] = allLumsShort[i];
-    }
+    final int[] allLums = ImageUtils.imageToGrayLumData(
+            ImageUtils.getScaledInstance(bi, MAX_DIM));
     calculateLumDeltaStack(allLums, deltas, MAX_DIM, 0);
     final List<Long> result = toByteFP(deltas);
     return result.size() < MAX_PRINTS ? result : result.subList(0, MAX_PRINTS);

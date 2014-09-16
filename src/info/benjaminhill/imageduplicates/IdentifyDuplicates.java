@@ -1,5 +1,7 @@
 package info.benjaminhill.imageduplicates;
 
+import com.google.common.collect.HashBasedTable;
+import com.google.common.collect.Table;
 import static info.benjaminhill.imageduplicates.ReadImageMetadata.buildDB;
 import info.benjaminhill.pcache.PCache;
 import info.benjaminhill.pcache.PCacheEntry;
@@ -24,86 +26,63 @@ public class IdentifyDuplicates {
     consoleHandler.setLevel(Level.FINER);
     LOG.addHandler(consoleHandler);
     try (final PCache<PCacheEntry> db = buildDB();) {
+
       final Map<String, PCacheEntry> all = db.getAll();
       System.out.println(all.size());
       System.out.println();
 
-      for (final PCacheEntry ent : all.values()) {
-        if (ent.getLong("h") < 50 || ent.getLong("w") < 50) {
+      for (final PCacheEntry ent1 : all.values()) {
+        if(!ent1.containsKey("h")) {
           continue;
         }
-        System.out.print(ent.getPk() + "\t" + ent.getDouble("r") + "\t");
+        
+        if (ent1.getLong("h") < 50 || ent1.getLong("w") < 50) {
+          continue;
+        }
+        
         int minDist = Integer.MAX_VALUE;
         PCacheEntry minOther = null;
-        for (final PCacheEntry other : all.values()) {
-          if (other.getLong("h") < 50 || other.getLong("w") < 50) {
+        
+        for (final PCacheEntry ent2 : all.values()) {
+          if(!ent2.containsKey("h")) {
             continue;
           }
-          if (ent.getPk().equals(other.getPk())) {
+          
+          if (ent1.getPk().compareTo(ent2.getPk()) >= 0) {
             continue;
           }
-          // Not the same image ratio
-          if (Math.round(100 * (ent.getDouble("r") - other.getDouble("r"))) > 0) {
+          if (ent2.getLong("h") < 50 || ent2.getLong("w") < 50) {
             continue;
           }
-          final int newDist =
-              ImageFingerprint.hammingBinaryDistance(ent.getLong("imgfp_2"),
-                  other.getLong("imgfp_2"));
-          if (newDist < minDist) {
-            minDist = newDist;
-            minOther = other;
+          
+          /*
+          // Too effective for now!
+          if (Math.round(100 * (ent1.getDouble("r") - ent2.getDouble("r"))) > 0) {
+            continue;
           }
-        }
-        if (minOther != null) {
-          System.out.println(minOther.getPk() + "\t" + minDist + "\t" + minOther.getDouble("r"));
+                  */
 
+          final int newDist = 
+                  1_000_000 * ImageFingerprint.hammingBinaryDistance(ent1.getLong("imgfp_0"), ent2.getLong("imgfp_0"))
+                  + 10_000 * ImageFingerprint.hammingBinaryDistance(ent1.getLong("imgfp_1"), ent2.getLong("imgfp_1"))
+                  + 100 * ImageFingerprint.hammingBinaryDistance(ent1.getLong("imgfp_2"), ent2.getLong("imgfp_2"))
+                  //+ 10 * ImageFingerprint.hammingBinaryDistance(ent1.getLong("imgfp_3"), ent2.getLong("imgfp_3"))
+                  ;
+
+          if(newDist < minDist) {
+            minOther = ent2;
+            minDist = newDist;
+          }
         }
+        
+        System.out.print(ent1.getPk());
+        if(minOther!=null) {
+          System.out.print("\t"+ minOther.getPk() + "\t" + minDist); 
+        }
+        System.out.println();
       }
+
+      
     }
   }
-  /*
-   * throws IOException, Exception {
-   *
-   * try (final PCache<PCacheEntry> db = buildDB();) {
-   *
-   * final Set<Set<String>> matches = db.getClusters(); System.out.printf("Found %s clusters.%n",
-   * matches.size()); int groupNum = 0; for (final Set<String> matchGroup : matches) { groupNum++;
-   * for (final String path : matchGroup) { System.out.printf("%s\t%s%n", groupNum, path); } }
-   *
-   * } }
-   *
-   *
-   *
-   * public Set<Set<String>> getClusters() { final Map<Integer, Set<Integer>> id2group = new
-   * ConcurrentHashMap<>(2 << 16); final Map<Integer, String> id2path = new ConcurrentHashMap<>(2 <<
-   * 16);
-   *
-   * try (final Statement stmt = conn.createStatement(); final ResultSet rs =
-   * stmt.executeQuery("select i1.id, i1.file_path fp1, i1.file_name fn1" + " from images i1");) {
-   * long row = 0; while (rs.next()) { row++; if (row % 5_000 == 0) {
-   * System.out.println("Preloading row:" + row); } final String f1 = rs.getString("fp1") +
-   * File.separator + rs.getString("fn1"); final int f1id = rs.getInt("id"); id2path.put(f1id, f1);
-   *
-   * final Set<Integer> newSet = new HashSet<>(); newSet.add(f1id); id2group.put(f1id, newSet); } }
-   * catch (final SQLException ex) { throw new RuntimeException(ex); }
-   *
-   * System.out.println("Done preloading.");
-   *
-   * try (final Statement stmt = conn.createStatement(); final ResultSet rs =
-   * stmt.executeQuery("select i1.id id1" + ", i2.id id2" + " FROM images i1, images i2" +
-   * " WHERE i1.id<i2.id AND i1.file_length>10000 AND (" + " i1.hash_min=i2.hash_min " +
-   * " OR i1.file_hash=i2.file_hash" + ")")) { long row = 0; while (rs.next()) { if (row % 5_000 ==
-   * 0) { System.out.println("Reading combo row:" + row); } final int f1id = rs.getInt("id1"); final
-   * int f2id = rs.getInt("id2");
-   *
-   * // assert file2group.containsKey(f1id) && file2group.containsKey(f2id); // If they aren't the
-   * same, make it so. if (id2group.get(f1id) != id2group.get(f2id)) {
-   * id2group.get(f1id).addAll(id2group.remove(f2id)); id2group.put(f2id, id2group.get(f1id)); }
-   * row++; } } catch (final SQLException ex) { throw new RuntimeException(ex); }
-   *
-   * final HashSet<Set<String>> result = new HashSet<>(); for (final Set<Integer> potential :
-   * id2group.values()) { if (potential.size() > 1) { final HashSet<String> resultSet = new
-   * HashSet<>(); for (final Integer id : potential) { resultSet.add(id2path.get(id)); }
-   * result.add(resultSet); } } return result; }
-   */
 }

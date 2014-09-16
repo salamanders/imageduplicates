@@ -74,27 +74,29 @@ public class ReadImageMetadata {
       pi.put("parent_path_h", FileUtils.hash(f.getParent()));
 
       final BufferedImage bi = ImageIO.read(f);
-      final int w = bi.getWidth(), h = bi.getHeight();
-      pi.put("w", w);
-      pi.put("h", h);
-      pi.put("r", Math.min(w / (double) h, h / (double) w));
+      if (bi != null) {
+        final int w = bi.getWidth(), h = bi.getHeight();
+        pi.put("w", w);
+        pi.put("h", h);
+        pi.put("r", Math.min(w / (double) h, h / (double) w));
 
-      BufferedImage thumb = ImageUtils.getScaledInstance(bi, ImageFingerprint.MAX_DIM);
+        BufferedImage thumb = ImageUtils.getScaledInstance(bi, ImageFingerprint.MAX_DIM);
 
-      final long imageHash0 = FileUtils.hash(ImageUtils.getData(thumb));
-      thumb = ImageUtils.rotate90(thumb);
-      final long imageHash90 = FileUtils.hash(ImageUtils.getData(thumb));
-      thumb = ImageUtils.rotate90(thumb);
-      final long imageHash180 = FileUtils.hash(ImageUtils.getData(thumb));
-      thumb = ImageUtils.rotate90(thumb);
-      final long imageHash270 = FileUtils.hash(ImageUtils.getData(thumb));
+        final long imageHash0 = FileUtils.hash(ImageUtils.getData(thumb));
+        thumb = ImageUtils.rotate90(thumb);
+        final long imageHash90 = FileUtils.hash(ImageUtils.getData(thumb));
+        thumb = ImageUtils.rotate90(thumb);
+        final long imageHash180 = FileUtils.hash(ImageUtils.getData(thumb));
+        thumb = ImageUtils.rotate90(thumb);
+        final long imageHash270 = FileUtils.hash(ImageUtils.getData(thumb));
 
-      pi.put("img_h_min", Longs.min(imageHash0, imageHash90, imageHash180, imageHash270));
+        pi.put("img_h_min", Longs.min(imageHash0, imageHash90, imageHash180, imageHash270));
 
-      final ImageFingerprint ifp = new ImageFingerprint(bi);
-      final List<Long> ifpVals = ifp.call();
-      for (int i = 0; i < ifpVals.size(); i++) {
-        pi.put("imgfp_" + i, ifpVals.get(i));
+        final ImageFingerprint ifp = new ImageFingerprint(bi);
+        final List<Long> ifpVals = ifp.call();
+        for (int i = 0; i < ifpVals.size(); i++) {
+          pi.put("imgfp_" + i, ifpVals.get(i));
+        }
       }
     } catch (final Exception ex) {
       LOG.log(Level.SEVERE, null, ex);
@@ -120,10 +122,10 @@ public class ReadImageMetadata {
           System.err.println(file.getAbsolutePath() + " caused " + ex);
         }
         numFiles++;
-        if (numFiles >= 1_000) {
-          System.err.println("Breaking on 1k");
-          break;
-        }
+        /*if (numFiles >= 1_000) {
+         System.err.println("Breaking on 1k");
+         break;
+         }*/
       }
       System.out.println("Waiting for finish");
       pcache.blockForFinish();

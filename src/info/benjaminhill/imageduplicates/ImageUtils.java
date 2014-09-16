@@ -103,7 +103,7 @@ public class ImageUtils {
    *
    * From http://www.tomgibara.com/computer-vision/CannyEdgeDetector.java
    */
-  private static int[] imageToGrayLumData(final BufferedImage sourceImage) {
+  public static int[] imageToGrayLumData(final BufferedImage sourceImage) {
     final int width = sourceImage.getWidth();
     final int height = sourceImage.getHeight();
     final int[] data = new int[width * height];
