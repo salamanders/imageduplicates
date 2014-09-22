@@ -36,6 +36,7 @@ import java.util.zip.GZIPOutputStream;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import java.util.logging.Logger;
 
 /**
  * Simple file-persisted cache You must provide a <code>
@@ -44,8 +45,10 @@ import com.google.common.cache.LoadingCache;
  * </code>
  *
  * @author benhill
+ * @param <T>
  */
 public class PCache<T extends Serializable> implements AutoCloseable {
+private static final Logger LOG = Logger.getAnonymousLogger();
 
   protected final String cacheFile;
 
@@ -82,7 +85,7 @@ public class PCache<T extends Serializable> implements AutoCloseable {
       try (final ObjectInputStream oos =
           new ObjectInputStream(new GZIPInputStream(new FileInputStream(cacheFile)))) {
         this.lcache.putAll((Map) oos.readObject());
-        System.err.println("Read cache file.");
+        LOG.info("Read cache file.");
       } catch (final Exception ex) {
         throw new IllegalArgumentException(ex);
       }

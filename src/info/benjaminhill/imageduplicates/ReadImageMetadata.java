@@ -20,23 +20,19 @@
  */
 package info.benjaminhill.imageduplicates;
 
+import com.google.common.cache.CacheLoader;
+import com.google.common.primitives.Longs;
 import info.benjaminhill.pcache.PCacheEntry;
 import info.benjaminhill.pcache.ParallelPCache;
-
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.SortedSet;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
+import javax.imageio.IIOException;
 import javax.imageio.ImageIO;
-
-import com.google.common.cache.CacheLoader;
-import com.google.common.primitives.Longs;
 
 /**
  * Keeps a DB of images. DB is keyed off of: size, hash of file, hash of thumb
@@ -45,10 +41,10 @@ import com.google.common.primitives.Longs;
  */
 public class ReadImageMetadata {
 
-  private static final Logger LOG = Logger.getAnonymousLogger();
+  private static final Logger LOG = Logger.getLogger(ReadImageMetadata.class.getName());
 
   public static ParallelPCache<PCacheEntry> buildDB() {
-    return new ParallelPCache(new CacheLoader<String, PCacheEntry>() {
+    return new ParallelPCache<>(new CacheLoader<String, PCacheEntry>() {
       @Override
       public PCacheEntry load(final String filePath) {
         final PCacheEntry pi = new PCacheEntry();
@@ -68,10 +64,10 @@ public class ReadImageMetadata {
         throw new IllegalArgumentException("Unable to read:" + filePath);
       }
 
-      pi.put("file_h", FileUtils.hashFile(f));
+      pi.put("file_h", BetterHash.hashFile(f));
       pi.put("file_len", f.length());
       pi.put("file_name", f.getName());
-      pi.put("parent_path_h", FileUtils.hash(f.getParent()));
+      pi.put("parent_path_h", BetterHash.hash(f.getParent()));
 
       final BufferedImage bi = ImageIO.read(f);
       if (bi != null) {
@@ -80,15 +76,17 @@ public class ReadImageMetadata {
         pi.put("h", h);
         pi.put("r", Math.min(w / (double) h, h / (double) w));
 
+        pi.put("img_h", BetterHash.hash(ImageUtils.getData(bi)));
+        
         BufferedImage thumb = ImageUtils.getScaledInstance(bi, ImageFingerprint.MAX_DIM);
 
-        final long imageHash0 = FileUtils.hash(ImageUtils.getData(thumb));
+        final long imageHash0 = BetterHash.hash(ImageUtils.getData(thumb));
         thumb = ImageUtils.rotate90(thumb);
-        final long imageHash90 = FileUtils.hash(ImageUtils.getData(thumb));
+        final long imageHash90 = BetterHash.hash(ImageUtils.getData(thumb));
         thumb = ImageUtils.rotate90(thumb);
-        final long imageHash180 = FileUtils.hash(ImageUtils.getData(thumb));
+        final long imageHash180 = BetterHash.hash(ImageUtils.getData(thumb));
         thumb = ImageUtils.rotate90(thumb);
-        final long imageHash270 = FileUtils.hash(ImageUtils.getData(thumb));
+        final long imageHash270 = BetterHash.hash(ImageUtils.getData(thumb));
 
         pi.put("img_h_min", Longs.min(imageHash0, imageHash90, imageHash180, imageHash270));
 
@@ -98,6 +96,8 @@ public class ReadImageMetadata {
           pi.put("imgfp_" + i, ifpVals.get(i));
         }
       }
+    } catch(final IIOException | ArrayIndexOutOfBoundsException ex) {
+      LOG.log(Level.WARNING, "Unable to read image:{0}", pi.getPk());
     } catch (final Exception ex) {
       LOG.log(Level.SEVERE, null, ex);
       throw new RuntimeException(ex);
@@ -105,29 +105,26 @@ public class ReadImageMetadata {
   }
 
   public static void main(final String... args) throws IOException, Exception {
-    final Handler consoleHandler = new ConsoleHandler();
-    consoleHandler.setLevel(Level.FINER);
-    LOG.addHandler(consoleHandler);
 
     try (final ParallelPCache<PCacheEntry> pcache = buildDB();) {
 
       final SortedSet<File> allImageFiles = FileUtils.getFilesByExtensions("jpg", "jpeg", "png");
-      System.out.println("Files found: " + allImageFiles.size());
+      LOG.log(Level.INFO, "Files found: {0}", allImageFiles.size());
       long numFiles = 0;
       for (final File file : allImageFiles) {
 
         try {
           pcache.getFuture(file.getAbsolutePath());
         } catch (final Exception ex) {
-          System.err.println(file.getAbsolutePath() + " caused " + ex);
+          LOG.log(Level.WARNING, "{0} caused {1}", new Object[]{file.getAbsolutePath(), ex});
         }
         numFiles++;
-        /*if (numFiles >= 1_000) {
-         System.err.println("Breaking on 1k");
-         break;
-         }*/
+        if (numFiles >= Integer.MAX_VALUE) {
+          LOG.log(Level.WARNING, "Breaking on {0}", Integer.MAX_VALUE);
+          break;
+        }
       }
-      System.out.println("Waiting for finish");
+      LOG.info("Waiting for finish");
       pcache.blockForFinish();
     }
   }

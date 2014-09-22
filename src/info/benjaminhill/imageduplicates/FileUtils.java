@@ -20,9 +20,10 @@
  */
 package info.benjaminhill.imageduplicates;
 
+import com.google.common.collect.Sets;
+import com.google.common.io.Files;
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -34,11 +35,6 @@ import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.google.common.collect.Sets;
-import com.google.common.hash.HashFunction;
-import com.google.common.hash.Hashing;
-import com.google.common.io.Files;
-
 /**
  * Generic file utilities like hashing
  *
@@ -46,10 +42,8 @@ import com.google.common.io.Files;
  */
 public class FileUtils {
 
-  public static final Set<String> EXCLUDES = Sets.newHashSet("/.", "iphoto library", "temp",
-      "library/developer", "library/application support/");
-
-  private static final HashFunction HF = Hashing.goodFastHash(Long.SIZE);
+  public static final Set<String> EXCLUDES = Sets.newHashSet(File.separatorChar+".", "iphoto library", "temp",
+      "library"+File.separatorChar+"developer", "library"+File.separatorChar+"application support");
 
   private static final Logger LOG = Logger.getLogger(FileUtils.class.getName());
 
@@ -65,7 +59,7 @@ public class FileUtils {
       public FileVisitResult preVisitDirectory(final Path dir, final BasicFileAttributes attrs) {
         for (final String exclude : EXCLUDES) {
           if (dir.toString().toLowerCase().contains(exclude)) {
-            LOG.log(Level.FINE, "Bailed on subdir:{0}", dir.toString());
+            LOG.log(Level.INFO, "Bailed on subdir:{0}", dir.toString());
             return FileVisitResult.SKIP_SUBTREE;
           }
         }
@@ -84,7 +78,7 @@ public class FileUtils {
       @Override
       public FileVisitResult visitFileFailed(final Path file, final IOException e)
           throws IOException {
-        System.err.printf("Visiting failed for %s%n", file);
+        LOG.log(Level.WARNING, "Visiting failed for {0}", file);
         return FileVisitResult.SKIP_SUBTREE;
       }
     });
@@ -92,32 +86,8 @@ public class FileUtils {
     return files;
   }
 
-  public static long hash(final byte[] input) {
-    return HF.hashBytes(input).padToLong();
-  }
 
-  public static long hash(final int[] input) {
-    final ByteBuffer bb = ByteBuffer.allocate(input.length * 4);
-    bb.asIntBuffer().put(input);
-    return HF.hashBytes(bb.array()).padToLong();
-  }
 
-  public static long hash(final String input) {
-    return HF.hashBytes(input.getBytes()).padToLong();
-  }
-
-  /**
-   *
-   * @param f
-   * @return Thread-safe hash of a file. Reads entire file into memory in one pass (bad)
-   */
-  public static long hashFile(final File f) {
-    try {
-      return Files.hash(f, HF).padToLong();
-    } catch (final IOException ex) {
-      throw new IllegalArgumentException(ex);
-    }
-  }
 
   private FileUtils() {
     // empty

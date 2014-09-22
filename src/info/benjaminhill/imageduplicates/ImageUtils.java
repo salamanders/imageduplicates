@@ -31,8 +31,6 @@ import com.google.common.primitives.Ints;
 
 public class ImageUtils {
 
-  private static final Logger LOG = Logger.getLogger(ImageUtils.class.getName());
-
   /**
    * Normally not needed image to integer pixel data
    *
@@ -206,12 +204,47 @@ public class ImageUtils {
     return rot;
   }
 
-  /*
-   * public static BufferedImage convertToGrayScale(final BufferedImage image) { BufferedImage
-   * result = new BufferedImage( image.getWidth(), image.getHeight(), BufferedImage.TYPE_BYTE_GRAY);
-   * Graphics2D g = (Graphics2D) result.getGraphics(); g.drawImage(image, 0, 0, null); g.dispose();
-   * return result; }
+  
+   /**
+   * For checking image dimensions
+   *
+   * @param x
+   * @return
    */
+  public static boolean isPowerOfTwo(final int x) {
+    return (x & (x - 1)) == 0;
+  }
+
+  /**
+   * Integer pixel to red component
+   *
+   * @param rgb
+   * @return
+   */
+  private static int red(final int rgb) {
+    return (rgb >> 16) & 0xFF;
+  }
+
+  /**
+   * Integer pixel to green component
+   *
+   * @param rgb
+   * @return
+   */
+  private static int green(final int rgb) {
+    return (rgb >> 8) & 0xFF;
+  }
+
+  /**
+   * Integer pixel to blue component
+   *
+   * @param rgb
+   * @return
+   */
+  private static int blue(final int rgb) {
+    return rgb & 0xFF;
+  }
+  
   private ImageUtils() {
     // empty
   }

@@ -18,7 +18,7 @@ import java.util.logging.Logger;
  */
 public class IdentifyDuplicates {
 
-  private static final Logger LOG = Logger.getAnonymousLogger();
+  private static final Logger LOG = Logger.getLogger(IdentifyDuplicates.class.getName());
 
   public static void main(final String... args) {
 
@@ -28,8 +28,7 @@ public class IdentifyDuplicates {
     try (final PCache<PCacheEntry> db = buildDB();) {
 
       final Map<String, PCacheEntry> all = db.getAll();
-      System.out.println(all.size());
-      System.out.println();
+      LOG.info("Size: " + all.size());
 
       for (final PCacheEntry ent1 : all.values()) {
         if(!ent1.containsKey("h")) {
