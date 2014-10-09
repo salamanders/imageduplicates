@@ -56,8 +56,8 @@ public class Main {
   private static final Logger LOG = Logger.getLogger(Main.class.getName());
 
   private static final ImagePHash PHASH = new ImagePHash();
-  private static final String HASH_PERCEPT = "h_p";
-  private static final String HASH_FULL = "h_f";
+  private static final String HASH_PERCEPT = "i.hp";
+  private static final String HASH_FULL = "i.h";
 
   public static void logConfig() {
     final Logger topLogger = java.util.logging.Logger.getLogger("");
@@ -137,17 +137,17 @@ public class Main {
         throw new IllegalArgumentException("Unable to read:" + filePath);
       }
 
-      pi.put("file_h", HashUtil.hash(f));
-      pi.put("file_len", f.length());
-      pi.put("file_name", f.getName());
-      pi.put("parent_path_h", HashUtil.hash(f.getParent()));
+      pi.put(FILE_HASH, HashUtil.hash(f));
+      pi.put(FILE_LENGTH, f.length());
+      pi.put(FILE_NAME, f.getName());
+      pi.put(FILE_PATH_PARENT_HASH, HashUtil.hash(f.getParent()));
 
       final BufferedImage bi = ImageIO.read(f);
       if (bi != null) {
         final int w = bi.getWidth(), h = bi.getHeight();
-        pi.put("w", w);
-        pi.put("h", h);
-        pi.put("r", Math.min(w / (double) h, h / (double) w));
+        pi.put(IMAGE_WIDTH, w);
+        pi.put(IMAGE_HEIGHT, h);
+        pi.put(IMAGE_RATIO, Math.min(w / (double) h, h / (double) w));
         pi.put(HASH_PERCEPT, HashUtil.hash(bi));
         pi.put(HASH_FULL, PHASH.getHash(bi));
         bi.flush();
@@ -158,9 +158,17 @@ public class Main {
       LOG.log(Level.WARNING, "Unable to read image:{0} {1}", new Object[]{pi.getPk(), ex});
     } catch (final Exception ex) {
       LOG.log(Level.SEVERE, null, ex);
+      LOG.log(Level.SEVERE, "Issue with:{0}", pi.getPk());
       throw new RuntimeException(ex);
     }
   }
+  private static final String FILE_PATH_PARENT_HASH = "f.p.h";
+  private static final String FILE_NAME = "f.n";
+  private static final String FILE_LENGTH = "f.l";
+  private static final String FILE_HASH = "f.h";
+  private static final String IMAGE_RATIO = "i.r";
+  private static final String IMAGE_HEIGHT = "i.h";
+  private static final String IMAGE_WIDTH = "i.w";
 
   private static void findDuplicates() {
     try (final PCache<PCacheEntry> db = Main.buildDB();) {
@@ -169,14 +177,11 @@ public class Main {
       LOG.log(Level.INFO, "Size: {0}", all.size());
       final SortedSet<String> goodKeys = new ConcurrentSkipListSet<>();
 
-      for (final PCacheEntry ent1 : all.values()) {
-        if (!ent1.containsKey("h")
-                || !ent1.containsKey(HASH_PERCEPT)
-                || ent1.getLong("h") < 400 || ent1.getLong("w") < 400) {
-          continue;
-        }
-        goodKeys.add(ent1.getPk());
-      }
+      all.values().stream().filter((ent1) -> !(!ent1.containsKey("h")
+              || !ent1.containsKey(HASH_PERCEPT)
+              || ent1.getLong("h") < 400 || ent1.getLong("w") < 400)).forEach((ent1) -> {
+                goodKeys.add(ent1.getPk());
+              });
 
       for (final String key1 : goodKeys) {
         final PCacheEntry ent1 = all.get(key1);

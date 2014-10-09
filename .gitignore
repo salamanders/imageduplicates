@@ -18,3 +18,4 @@ hs_err_pid*
 /nbproject/
 /bin/
 /mydb.sqlite
+/cache.image_metadata.gz
