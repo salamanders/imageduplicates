@@ -3,12 +3,12 @@ package info.benjaminhill.imageduplicates;
 import java.awt.image.BufferedImage;
 import java.nio.ByteBuffer;
 import org.imgscalr.Scalr;
-/*
+
+/**
  * pHash-like image hash.
- * Author: Elliot Shepherd (elliot@jarofworms.com
+ * Author: Elliot Shepherd elliot@jarofworms.com
  * Based On: http://www.hackerfactor.com/blog/index.php?/archives/432-Looks-Like-It.html
  */
-
 public class ImagePHash {
 
   private static final int SIZE = 32;
@@ -18,7 +18,7 @@ public class ImagePHash {
     return (img.getRGB(x, y)) & 0xff;
   }
 
-  // DCT function stolen from http://stackoverflow.com/questions/4240490/problems-with-dct-and-idct-algorithm-in-java
+  // DCT function from http://stackoverflow.com/questions/4240490/problems-with-dct-and-idct-algorithm-in-java
   private final double[] c;
 
   public ImagePHash() {
@@ -49,7 +49,6 @@ public class ImagePHash {
       }
     }
     img.flush();
-    img = null;
 
     /* 3. Compute the DCT.
      * The DCT separates the image into a collection of frequencies

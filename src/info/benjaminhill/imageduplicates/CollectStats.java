@@ -1,7 +1,7 @@
 /*
  * The MIT License
  *
- * Copyright 2014 benjamin.
+ * Copyright 2014 Benjamin Hill.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -45,19 +45,16 @@ import java.util.logging.Logger;
 import javax.imageio.IIOException;
 import javax.imageio.ImageIO;
 import javax.swing.JFileChooser;
-import org.imgscalr.Scalr;
 
 /**
  *
- * @author benjamin
+ * @author Benjamin Hill
  */
-public class Main {
+public class CollectStats {
 
-  private static final Logger LOG = Logger.getLogger(Main.class.getName());
-
+  private static final Logger LOG = Logger.getLogger(CollectStats.class.getName());
   private static final ImagePHash PHASH = new ImagePHash();
-  private static final String HASH_PERCEPT = "i.hp";
-  private static final String HASH_FULL = "i.h";
+  public static final String IMG_HASH_PERCEPT = "i.hp", IMG_HASH_FULL = "i.hf", FILE_PATH_PARENT_HASH = "f.p.h", FILE_NAME = "f.n", FILE_LENGTH = "f.l", FILE_HASH = "f.h", IMAGE_RATIO = "i.r", IMAGE_HEIGHT = "i.h", IMAGE_WIDTH = "i.w";
 
   public static void logConfig() {
     final Logger topLogger = java.util.logging.Logger.getLogger("");
@@ -74,9 +71,9 @@ public class Main {
     }
     consoleHandler.setLevel(java.util.logging.Level.ALL);
   }
-  
+
   private static Path getStartingPath() {
-        final JFileChooser jfc = new JFileChooser();
+    final JFileChooser jfc = new JFileChooser();
     jfc.setDialogTitle("Choose the folder to scan");
     jfc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
     jfc.setApproveButtonText("Start in this Folder");
@@ -92,7 +89,6 @@ public class Main {
     final SortedSet<File> images = new RecursiveFileFind().walkFrom(getStartingPath());
     LOG.log(Level.INFO, "Found {0} images.", images.size());
     readImageData(images);
-    findDuplicates();
   }
 
   private static void readImageData(final SortedSet<File> allImageFiles) {
@@ -148,8 +144,9 @@ public class Main {
         pi.put(IMAGE_WIDTH, w);
         pi.put(IMAGE_HEIGHT, h);
         pi.put(IMAGE_RATIO, Math.min(w / (double) h, h / (double) w));
-        pi.put(HASH_PERCEPT, HashUtil.hash(bi));
-        pi.put(HASH_FULL, PHASH.getHash(bi));
+        
+        pi.put(IMG_HASH_FULL, HashUtil.hash(bi));
+        pi.put(IMG_HASH_PERCEPT, PHASH.getHash(bi));
         bi.flush();
 
         //BufferedImage thumb = Scalr.resize(bi, Scalr.Method.AUTOMATIC, Scalr.Mode.FIT_EXACT, 32, Scalr.OP_GRAYSCALE);
@@ -162,53 +159,5 @@ public class Main {
       throw new RuntimeException(ex);
     }
   }
-  private static final String FILE_PATH_PARENT_HASH = "f.p.h";
-  private static final String FILE_NAME = "f.n";
-  private static final String FILE_LENGTH = "f.l";
-  private static final String FILE_HASH = "f.h";
-  private static final String IMAGE_RATIO = "i.r";
-  private static final String IMAGE_HEIGHT = "i.h";
-  private static final String IMAGE_WIDTH = "i.w";
 
-  private static void findDuplicates() {
-    try (final PCache<PCacheEntry> db = Main.buildDB();) {
-
-      final Map<String, PCacheEntry> all = db.getAll();
-      LOG.log(Level.INFO, "Size: {0}", all.size());
-      final SortedSet<String> goodKeys = new ConcurrentSkipListSet<>();
-
-      all.values().stream().filter((ent1) -> !(!ent1.containsKey("h")
-              || !ent1.containsKey(HASH_PERCEPT)
-              || ent1.getLong("h") < 400 || ent1.getLong("w") < 400)).forEach((ent1) -> {
-                goodKeys.add(ent1.getPk());
-              });
-
-      for (final String key1 : goodKeys) {
-        final PCacheEntry ent1 = all.get(key1);
-        int minDistance = Integer.MAX_VALUE;
-        PCacheEntry minEntry = null;
-        for (final String key2 : goodKeys) {
-          if (key1.equals(key2)) {
-            continue;
-          }
-          if (minDistance == 0) {
-            break;
-          }
-          final int dist = HashUtil.hammingDistance(ent1.getBytes(HASH_PERCEPT), all.get(key2).getBytes(HASH_PERCEPT));
-          if (dist < minDistance) {
-            minDistance = dist;
-            minEntry = all.get(key2);
-          }
-        }
-        if (minEntry != null && minDistance < 3) {
-          System.out.print(ent1.getPk());
-          System.out.print("\t" + HashUtil.encodeToString(ent1.getBytes(HASH_PERCEPT)));
-          System.out.print("\t" + minEntry.getPk());
-          System.out.print("\t" + minDistance);
-          System.out.print("\t" + Arrays.equals(ent1.getBytes(HASH_FULL),minEntry.getBytes(HASH_FULL)));
-          System.out.println();
-        }
-      }
-    }
-  }
 }
